@@ -1,0 +1,28 @@
+# Credentials — never commit. Copy Secrets.example.swift to Secrets.swift.
+AstroChat/Secrets.swift
+
+# macOS
+.DS_Store
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Build output
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods / Carthage, if ever added
+Pods/
+Carthage/Build/
