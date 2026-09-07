@@ -205,17 +205,23 @@ struct QuotedStrip: View {
 /// which draws the identical paths.
 private enum Tick {
     static let w: CGFloat = 10.4        // one checkmark
+    static let h: CGFloat = 8           // and its height
     static let gap: CGFloat = 3.2       // horizontal offset between the two
+    static let clockD: CGFloat = 12     // pending clock, drawn at 12x12
+    static let clockRef: CGFloat = 6.667 // the size the clock's hands were drawn at
+    static let clockK: CGFloat = clockD / clockRef
     static let slotW: CGFloat = w + gap // 13.6
-    static let slotH: CGFloat = 8
-    static let clockD: CGFloat = 6.667
+    // The slot is sized to the largest glyph in it, so switching state never
+    // reflows. 12pt still sits inside the 10pt timestamp's line box next to
+    // it, so the bubble does not grow either.
+    static let slotH: CGFloat = clockD
 }
 
 /// The design's bevelled checkmark. Not SF Symbols' `checkmark`, which is a
 /// different shape and whose optical weight drifts with the font.
 private struct TickShape: Shape {
     func path(in r: CGRect) -> Path {
-        let sx = r.width / Tick.w, sy = r.height / Tick.slotH
+        let sx = r.width / Tick.w, sy = r.height / Tick.h
         func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(x: r.minX + x * sx, y: r.minY + y * sy)
         }
@@ -232,12 +238,15 @@ private struct TickShape: Shape {
 }
 
 /// Outline clock for the pending state. Stroked, so the ellipse is inset by
-/// half the line width to keep the drawn edge inside the frame.
+/// half the line width to keep the drawn edge inside the frame. The hands and
+/// the stroke stay in the same proportion to the dial they were drawn at, so
+/// growing the dial does not restyle the glyph.
 private struct ClockShape: Shape {
     func path(in r: CGRect) -> Path {
-        let d = min(r.width, r.height), s = d / Tick.clockD
+        let d = min(r.width, r.height), s = d / Tick.clockRef
+        let inset = Tick.clockK / 2
         var p = Path()
-        p.addEllipse(in: r.insetBy(dx: 0.5, dy: 0.5))
+        p.addEllipse(in: r.insetBy(dx: inset, dy: inset))
         let c = CGPoint(x: r.midX, y: r.midY)
         p.move(to: CGPoint(x: c.x, y: c.y - 1.333 * s))
         p.addLine(to: c)
@@ -265,18 +274,20 @@ struct StatusTicks: View {
         ZStack(alignment: .topLeading) {
             TickShape()
                 .fill(tint)
-                .frame(width: Tick.w, height: Tick.slotH)
-                .offset(x: Tick.gap)
+                .frame(width: Tick.w, height: Tick.h)
+                .offset(x: Tick.gap, y: (Tick.slotH - Tick.h) / 2)
                 .opacity(status == .sending ? 0 : 1)
 
             TickShape()
                 .fill(tint)
-                .frame(width: Tick.w, height: Tick.slotH)
+                .frame(width: Tick.w, height: Tick.h)
+                .offset(y: (Tick.slotH - Tick.h) / 2)
                 .opacity(status >= .delivered ? 1 : 0)
 
             ClockShape()
                 .stroke(Color.muted,
-                        style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+                        style: StrokeStyle(lineWidth: Tick.clockK,
+                                           lineCap: .round, lineJoin: .round))
                 .frame(width: Tick.clockD, height: Tick.clockD)
                 .offset(x: Tick.slotW - 0.667 - Tick.clockD,
                         y: (Tick.slotH - Tick.clockD) / 2)
