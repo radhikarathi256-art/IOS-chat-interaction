@@ -51,7 +51,7 @@ struct Message: Identifiable, Equatable {
 extension Color {
     static let inkDark    = Color(red: 0.114, green: 0.161, blue: 0.224)  // #1D2939
     static let sentBg     = Color(red: 0.988, green: 0.882, blue: 0.843)  // #FCE1D7
-    static let chatBg     = Color(red: 0.94, green: 0.96, blue: 1.00)
+    static let chatBg     = Color(red: 0.973, green: 0.957, blue: 0.945)  // #F8F4F1
     static let muted      = Color(red: 0.596, green: 0.635, blue: 0.702)  // #98A2B3
     static let subtle     = Color(red: 0.400, green: 0.439, blue: 0.522)  // #667085
     static let readBlue   = Color(red: 0.043, green: 0.647, blue: 0.925)  // #0BA5EC
