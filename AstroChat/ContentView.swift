@@ -43,12 +43,18 @@ struct Message: Identifiable, Equatable {
 
 // MARK: - Palette
 
+// The values carrying a hex comment are sampled from the design export
+// "Group 1261158377.svg" and are shared with the Android client, which uses the
+// same hex. Each was previously off by a point or two per channel — invisible
+// alone, but a drift away from the source that both platforms were compounding
+// independently.
 extension Color {
-    static let inkDark    = Color(red: 0.11, green: 0.16, blue: 0.22)
-    static let sentBg     = Color(red: 0.99, green: 0.88, blue: 0.84)
+    static let inkDark    = Color(red: 0.114, green: 0.161, blue: 0.224)  // #1D2939
+    static let sentBg     = Color(red: 0.988, green: 0.882, blue: 0.843)  // #FCE1D7
     static let chatBg     = Color(red: 0.94, green: 0.96, blue: 1.00)
-    static let muted      = Color(red: 0.60, green: 0.64, blue: 0.70)
-    static let subtle     = Color(red: 0.40, green: 0.45, blue: 0.50)
+    static let muted      = Color(red: 0.596, green: 0.635, blue: 0.702)  // #98A2B3
+    static let subtle     = Color(red: 0.400, green: 0.439, blue: 0.522)  // #667085
+    static let readBlue   = Color(red: 0.043, green: 0.647, blue: 0.925)  // #0BA5EC
     static let pillBg     = Color(red: 0.95, green: 0.96, blue: 0.97)
     static let pillStroke = Color(red: 0.82, green: 0.84, blue: 0.87)
     static let pillText   = Color(red: 0.20, green: 0.25, blue: 0.33)
@@ -194,27 +200,90 @@ struct QuotedStrip: View {
 
 // MARK: - Delivery ticks
 
-/// §13/§14. Both glyphs are ALWAYS laid out; a status change only moves opacity
+/// Glyph metrics, in points, lifted from the design export
+/// "Group 1261158377.svg". One SVG user unit is one point. Shared with Android,
+/// which draws the identical paths.
+private enum Tick {
+    static let w: CGFloat = 10.4        // one checkmark
+    static let gap: CGFloat = 3.2       // horizontal offset between the two
+    static let slotW: CGFloat = w + gap // 13.6
+    static let slotH: CGFloat = 8
+    static let clockD: CGFloat = 6.667
+}
+
+/// The design's bevelled checkmark. Not SF Symbols' `checkmark`, which is a
+/// different shape and whose optical weight drifts with the font.
+private struct TickShape: Shape {
+    func path(in r: CGRect) -> Path {
+        let sx = r.width / Tick.w, sy = r.height / Tick.slotH
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: r.minX + x * sx, y: r.minY + y * sy)
+        }
+        var path = Path()
+        path.move(to: p(10.400, 0.844))
+        path.addLine(to: p(3.302, 8.000))
+        path.addLine(to: p(0.000, 4.669))
+        path.addLine(to: p(0.837, 3.825))
+        path.addLine(to: p(3.302, 6.312))
+        path.addLine(to: p(9.563, 0.000))
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Outline clock for the pending state. Stroked, so the ellipse is inset by
+/// half the line width to keep the drawn edge inside the frame.
+private struct ClockShape: Shape {
+    func path(in r: CGRect) -> Path {
+        let d = min(r.width, r.height), s = d / Tick.clockD
+        var p = Path()
+        p.addEllipse(in: r.insetBy(dx: 0.5, dy: 0.5))
+        let c = CGPoint(x: r.midX, y: r.midY)
+        p.move(to: CGPoint(x: c.x, y: c.y - 1.333 * s))
+        p.addLine(to: c)
+        p.addLine(to: CGPoint(x: c.x + 0.833 * s, y: c.y + 0.833 * s))
+        return p
+    }
+}
+
+/// §13/§14. Every glyph is ALWAYS laid out; a status change only moves opacity
 /// and colour. The frame is a fixed width in every state because a bubble is as
 /// wide as its widest row — if this grew when the second tick appeared, an ack
 /// arriving would resize the bubble and shove the whole conversation. Nothing
 /// here may ever affect geometry.
+///
+/// The pair is right-aligned, matching the export, where the single tick and the
+/// right-hand tick of the pair share an edge. Going from sent to delivered the
+/// tick already on screen therefore stays put and the new one appears to its
+/// left; growing rightward instead nudges the visible tick.
 struct StatusTicks: View {
     let status: DeliveryStatus
 
-    var body: some View {
-        ZStack(alignment: .leading) {
-            tick.opacity(status == .sending ? 0.35 : 1)
-            tick.offset(x: 4).opacity(status >= .delivered ? 1 : 0)
-        }
-        .foregroundStyle(status == .read ? Color.blue : Color.muted)
-        .frame(width: 14, height: 9, alignment: .leading)
-        .animation(.easeInOut(duration: 0.18), value: status)
-    }
+    private var tint: Color { status == .read ? .readBlue : .muted }
 
-    private var tick: some View {
-        Image(systemName: "checkmark")
-            .font(.system(size: 9, weight: .bold))
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            TickShape()
+                .fill(tint)
+                .frame(width: Tick.w, height: Tick.slotH)
+                .offset(x: Tick.gap)
+                .opacity(status == .sending ? 0 : 1)
+
+            TickShape()
+                .fill(tint)
+                .frame(width: Tick.w, height: Tick.slotH)
+                .opacity(status >= .delivered ? 1 : 0)
+
+            ClockShape()
+                .stroke(Color.muted,
+                        style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+                .frame(width: Tick.clockD, height: Tick.clockD)
+                .offset(x: Tick.slotW - 0.667 - Tick.clockD,
+                        y: (Tick.slotH - Tick.clockD) / 2)
+                .opacity(status == .sending ? 1 : 0)
+        }
+        .frame(width: Tick.slotW, height: Tick.slotH, alignment: .topLeading)
+        .animation(.easeInOut(duration: 0.18), value: status)
     }
 }
 
